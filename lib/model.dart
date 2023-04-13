@@ -15,8 +15,14 @@ class ImageDto {
   final String fullscreenUrl;
   final int index;
   final int nb;
+  final int width;
+  final int height;
 
-  ImageDto(this.littleUrl, this.fullscreenUrl, this.index, this.nb);
+  ImageDto(this.littleUrl, this.fullscreenUrl, this.index, this.width, this.height, this.nb);
+
+  bool isPortrait(){
+    return height / width > 1;
+  }
 }
 
 class Picture {

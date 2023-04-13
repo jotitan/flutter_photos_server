@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:photos_server_flutter/list_photos.dart';
 import 'package:photos_server_flutter/model.dart';
+import 'package:provider/provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(ChangeNotifierProvider(
+      create: (BuildContext context) {
+        return FilterValueStore();
+      },
+      child: const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -19,15 +24,55 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: MyRealHomePage('Photos server', key),
+      //home: CropTest(key),
     );
   }
 }
 
-class Counter extends StatefulWidget {
-  const Counter({Key? key}) : super(key: key);
+class CropTest extends StatelessWidget {
+  const CropTest(Key? key) : super(key: key);
 
   @override
-  State<Counter> createState() => _CounterState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: MyAppBar('Test'),
+        body: Row(
+          children:[
+            ImageView(
+                ImageDto("/image/PHOTOS/2016/2016_05_SAINT_MALO/IMG_1256_Dxo-250.jpg", "", 1, 375, 250, 1), 180, List.empty(), null),
+            ImageView(
+                ImageDto("/image/PHOTOS/2016/2016_05_SAINT_MALO/IMG_1174_Dxo-250.jpg", "", 2, 250, 375, 1), 180, List.empty(), null),
+            ]
+            /*ClipRect(
+              child:
+              Container(
+                color: Colors.blue,
+                child:Align(
+                  child: FolderHelper().getImage(
+                      "/image/PHOTOS/2016/2016_05_SAINT_MALO/IMG_1256_Dxo-250.jpg"),
+                  heightFactor: 1.1,
+                  widthFactor: 0.45,
+                  alignment: Alignment.center,
+                ),
+              ),
+            ),
+            ClipRect(
+              child:
+              Container(
+                color: Colors.red,
+                child:Align(
+                  child: FolderHelper().getImage(
+                      "/image/PHOTOS/2016/2016_05_SAINT_MALO/IMG_1259_Dxo-250.jpg"),
+                  heightFactor: 1.1,
+                  widthFactor: 0.45,
+                  alignment: Alignment.center,
+                ),
+              ),
+            )
+          ]*/
+        )
+    );
+  }
 }
 
 class MyRealHomePage extends StatelessWidget {
@@ -49,11 +94,28 @@ class MyRealHomePage extends StatelessWidget {
   }
 }
 
+class FilterValueStore extends ChangeNotifier {
+  String value = "";
+
+  void update(String v) {
+    value = v;
+    notifyListeners();
+  }
+}
+
 class FilterFolders extends StatelessWidget {
-  const FilterFolders(Key? key) : super(key: key);
+  final TextEditingController controller = TextEditingController();
+
+  FilterFolders(Key? key) {}
+
+  void runSearch(FilterValueStore store) {
+    store.update(controller.text);
+  }
 
   @override
   Widget build(BuildContext context) {
+    var store = context.watch<FilterValueStore>();
+    controller.text = store.value;
     return Container(
         color: const Color.fromRGBO(0, 21, 34, 1),
         child: Row(
@@ -64,12 +126,12 @@ class FilterFolders extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 color: Colors.white,
               ),
-              child: const TextField(
-                decoration: InputDecoration(
+              child: TextField(
+                controller: controller,
+                decoration: const InputDecoration(
                     hintText: "Répertoire",
                     contentPadding: EdgeInsets.only(left: 10),
                     border: InputBorder.none),
-                onChanged: null,
               ),
             )),
             const SizedBox(width: 10),
@@ -80,7 +142,9 @@ class FilterFolders extends StatelessWidget {
                 ),
                 width: 40,
                 height: 40,
-                child: Icon(Icons.loupe_rounded)),
+                child: IconButton(
+                    onPressed: () => runSearch(store),
+                    icon: Icon(Icons.loupe_rounded))),
             const SizedBox(width: 10),
           ],
         ));
@@ -106,6 +170,7 @@ class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
 
 class Folders extends StatefulWidget {
   final Widget parentWidget;
+
   const Folders(this.parentWidget, {Key? key}) : super(key: key);
 
   @override
@@ -115,6 +180,7 @@ class Folders extends StatefulWidget {
 class _FoldersState extends State<Folders> {
   late final Future<Folder> folders;
   final Widget parentWidget;
+
   _FoldersState(this.parentWidget);
 
   @override
@@ -123,80 +189,65 @@ class _FoldersState extends State<Folders> {
     folders = FolderHelper().getFolders();
   }
 
+  Future<Folder> getFolders(String filter) {
+    print("GET FOLERS $filter");
+    if (filter.isEmpty) {
+      return folders;
+    } else {
+      return filterFolders(filter);
+    }
+  }
+
+  Future<Folder> filterFolders(String filter) async {
+    Folder f = await folders;
+    return Folder(
+        f.name, f.link, f.hasImages, filterChildren(f.children, filter));
+  }
+
+  List<Folder> filterChildren(List<Folder> folders, String filter) {
+    List<Folder> filtered = List.empty(growable: true);
+    for (var folder in folders) {
+      if (folder.name.contains(filter)) {
+        filtered.add(folder);
+      } else {
+        if (folder.children.isNotEmpty) {
+          List<Folder> filteredChildren =
+              filterChildren(folder.children, filter);
+          if (filteredChildren.isNotEmpty) {
+            filtered.add(Folder(
+                folder.name, folder.link, folder.hasImages, filteredChildren));
+          }
+        }
+      }
+    }
+    return filtered;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
         color: const Color.fromRGBO(0, 21, 34, 1),
-        //height: 2000,
-        child: FutureBuilder<Folder>(
-            future: folders,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Text("Loading");
-              } else {
-                if (snapshot.hasError) {
-                  return AlertDialog(
-                    title: const Text("Impossible de charger les données"),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, 'OK'),
-                        child: const Text('OK'),
-                      )
-                    ],
-                  );
+        child: Consumer<FilterValueStore>(builder: (context2, store, child) {
+          return FutureBuilder<Folder>(
+              future: getFolders(store.value),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Text("Loading");
+                } else {
+                  if (snapshot.hasError) {
+                    return AlertDialog(
+                      title: const Text("Impossible de charger les données"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, 'OK'),
+                          child: const Text('OK'),
+                        )
+                      ],
+                    );
+                  }
+                  return FoldersView(snapshot.data!.children, parentWidget);
                 }
-                return FoldersView(snapshot.data!.children, parentWidget);
-              }
-            }));
-  }
-}
-
-class _CounterState extends State<Counter> {
-  int _counter = 0;
-
-  _CounterState() {}
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  void _decrementCounter() {
-    setState(() {
-      _counter--;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Center(
-      // Center is a layout widget. It takes a single child and positions it
-      // in the middle of the parent.
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'You have pushed the button this many times:',
-          ),
-          Text(
-            '$_counter',
-            style: Theme.of(context).textTheme.headline4,
-          ),
-          const Text('Super resultats'),
-          FloatingActionButton(
-              onPressed: _incrementCounter, child: const Icon(Icons.add)),
-          FloatingActionButton(
-              onPressed: _decrementCounter, child: const Icon(Icons.remove))
-        ],
-      ),
-    );
-    // This trailing comma makes auto-formatting nicer for build methods.
+              });
+        }));
   }
 }
