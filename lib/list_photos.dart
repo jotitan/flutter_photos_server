@@ -1,10 +1,9 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:photos_server_flutter/api_key.dart';
 import 'package:photos_server_flutter/model.dart';
+import 'package:photos_server_flutter/provider/images_provider.dart';
+import 'package:photos_server_flutter/provider/navigation_provider.dart';
+import 'package:photos_server_flutter/widget/fullscreen.dart';
+import 'package:provider/provider.dart';
 
 class GalleryView extends StatelessWidget {
   const GalleryView({Key? key}) : super(key: key);
@@ -12,91 +11,6 @@ class GalleryView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container();
-  }
-}
-
-class FullscreenImage extends StatefulWidget {
-  final String url;
-  final int index;
-  final int nb;
-  final List<Picture> pictures;
-  final PicturesOfFolderView? parentFolder;
-
-  const FullscreenImage(
-      this.url, this.index, this.nb, this.pictures, this.parentFolder,
-      {Key? key})
-      : super(key: key);
-
-  @override
-  State<FullscreenImage> createState() =>
-      _FullscreenImageSate(url, index, nb, pictures, parentFolder);
-}
-
-class _FullscreenImageSate extends State<FullscreenImage> {
-  String url;
-  int index;
-  final int nb;
-  final List<Picture> pictures;
-  final PicturesOfFolderView? parentFolder;
-  bool left = false;
-
-  _FullscreenImageSate(
-      this.url, this.index, this.nb, this.pictures, this.parentFolder);
-
-  void updateUrl(int idx) {
-    setState(() {
-      url = pictures[idx].medium;
-      index = idx;
-    });
-  }
-
-  void update(double delta) {
-    left = delta != 0;
-  }
-
-  void goto(Picture picture, int index) {
-    Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (context) => FullscreenImage(
-                picture.medium, index, nb, pictures, parentFolder)));
-  }
-
-  void goBack() {
-    Navigator.push(
-        context, MaterialPageRoute(builder: (context) => parentFolder!));
-  }
-
-  Widget getImage() {
-    return GestureDetector(
-        onHorizontalDragUpdate: (e) {
-          update(e.delta.direction);
-        },
-        onHorizontalDragEnd: (e) {
-          if (left && index < nb) {
-            updateUrl(index + 1);
-          }
-          if (!left && index > 0) {
-            updateUrl(index - 1);
-          }
-        },
-        onDoubleTap: () {
-          goBack();
-        },
-        child: FolderHelper().getImage(url));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(
-          title: Text("${index + 1} / $nb"),
-          centerTitle: true,
-          leading: IconButton(
-              onPressed: () => goBack(),
-              icon: const Icon(Icons.close_fullscreen)),
-        ),
-        body: Container(color: Colors.black, child: Center(child: getImage())));
   }
 }
 
@@ -135,16 +49,17 @@ class ImageView extends StatelessWidget {
     return [factorWidth, factorHeight];
   }
 
-  Widget getImageWithRatio(BuildContext context) {
+  Widget getImageWithRatio(BuildContext context, Navigation n) {
     List<double> dimensions = computeDimensions();
     List<double> ratios = computeRatio(dimensions);
     return GestureDetector(
         onTap: () {
+          n.setPrevious(parentFolder!);
           Navigator.push(
               context,
               MaterialPageRoute(
                   builder: (context) => FullscreenImage(detail.fullscreenUrl,
-                      detail.index, detail.nb, pictures, parentFolder)));
+                      detail.index, detail.nb, pictures)));
         },
         child: ClipRect(
           child: Container(
@@ -162,7 +77,12 @@ class ImageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return getImageWithRatio(context);
+    return Consumer<Navigation>(
+      builder: (ctx, nav, child) {
+        return getImageWithRatio(context, nav);
+      },
+    );
+    //return getImageWithRatio(context);
   }
 }
 
@@ -228,8 +148,9 @@ class FolderView extends StatelessWidget {
           Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (context) =>
-                      PicturesOfFolderView(folder, parentWidget, key)));
+                  builder: (context) => PicturesOfFolderView(
+                      folder.name, folder.link, parentWidget,
+                      key: key)));
         },
       ));
       row.children.add(const SizedBox(width: 10));
@@ -255,10 +176,13 @@ class FolderView extends StatelessWidget {
 }
 
 class PicturesOfFolderView extends StatelessWidget {
-  final Folder folder;
+  final String name;
+  final String searchKey;
   final Widget parentWidget;
+  final bool loadByDate;
 
-  const PicturesOfFolderView(this.folder, this.parentWidget, Key? key)
+  const PicturesOfFolderView(this.name, this.searchKey, this.parentWidget,
+      {this.loadByDate = false, Key? key})
       : super(key: key);
 
   List<Widget> get(List<Picture> pictures, double width) {
@@ -286,11 +210,12 @@ class PicturesOfFolderView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    late Future<List<Picture>> pictures =
-        FolderHelper().getPhotosOfFolder(folder);
+    late Future<List<Picture>> pictures = loadByDate
+        ? FolderHelper.getPhotosByDate(searchKey)
+        : FolderHelper.getPhotosOfFolder(searchKey);
 
     return Scaffold(
-      appBar: FolderBar(folder.name, parentWidget),
+      appBar: FolderBar(name, parentWidget),
       body: SingleChildScrollView(
           child: FutureBuilder(
         future: pictures,
@@ -302,7 +227,15 @@ class PicturesOfFolderView extends StatelessWidget {
             );
           } else {
             if (snapshot.hasError) {
-              print(snapshot.error);
+              return AlertDialog(
+                title: const Text("Impossible de charger les photos"),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, 'OK'),
+                    child: const Text('OK'),
+                  )
+                ],
+              );
             }
             return const Text("Loading");
           }
@@ -335,42 +268,5 @@ class FolderBar extends StatelessWidget implements PreferredSizeWidget {
         ),
       ),
     );
-  }
-}
-
-class FolderHelper {
-  Future<Folder> getFolders() async {
-    var resp = await http.get(Uri.parse("$endpoint/rootFolders"),
-        headers: {HttpHeaders.cookieHeader: "token=$apiKey"});
-    var content = jsonDecode(resp.body);
-    var folder = Folder.fromJSON(content);
-    return folder.children[0];
-  }
-
-  Future<List<Picture>> getPhotosOfFolder(Folder folder) async {
-    var resp = await http.get(Uri.parse("$endpoint${folder.link}"),
-        headers: {HttpHeaders.cookieHeader: "token=$apiKey"});
-    var content = jsonDecode(resp.body);
-    var files = content["Files"] as List;
-    var data = files
-        .where((d) => (d as Map<String, dynamic>).containsKey("ThumbnailLink"))
-        .map((f) => Picture.fromJSON(f))
-        .toList();
-    data.sort((a, b) => a.date.compareTo(b.date));
-    return data;
-  }
-
-  Image getImage(String url) {
-    return Image.network("$endpoint$url",
-        fit: BoxFit.fill,
-        headers: const {HttpHeaders.cookieHeader: "token=$apiKey"});
-  }
-
-  Image getImageWithSize(String url, double width, double height) {
-    return Image.network("$endpoint$url",
-        width: width,
-        height: height,
-        fit: BoxFit.fill,
-        headers: const {HttpHeaders.cookieHeader: "token=$apiKey"});
   }
 }

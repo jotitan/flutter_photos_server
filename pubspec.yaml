@@ -37,7 +37,8 @@ dependencies:
   format: ^1.1.1
   http: ^0.13.5
   provider: ^6.0.0
-
+  syncfusion_flutter_calendar: ^20.4.44
+  table_calendar: ^3.0.8
 
 dev_dependencies:
   flutter_test:

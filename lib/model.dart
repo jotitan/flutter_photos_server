@@ -41,6 +41,17 @@ class Picture {
   }
 }
 
+class NbPhotosByDate {
+  final DateTime date;
+  final int nb;
+
+  NbPhotosByDate(this.date, this.nb);
+
+  factory NbPhotosByDate.fromJSON(Map<String, dynamic> m){
+    return NbPhotosByDate(DateTime.parse(m["Date"]), m["Nb"]);
+  }
+}
+
 class Folder {
   final String name;
   final String link;
