@@ -29,6 +29,19 @@ class CalendarState extends State<PhotosCalendar> {
                 appBar: AppBar(
                   title: const Text("Calendrier"),
                   automaticallyImplyLeading: false,
+                  actions: [
+                    IconButton(
+                    icon: const Icon(Icons.skip_previous_rounded),
+                    onPressed: (){
+                      nav.setDisplayedDate(DateTime(nav.displayedDate.year-1,nav.displayedDate.month,nav.displayedDate.day));
+                    },
+                  ),
+                    IconButton(
+                      icon: const Icon(Icons.skip_next_rounded),
+                      onPressed: (){
+                        nav.setDisplayedDate(DateTime(nav.displayedDate.year+1,nav.displayedDate.month,nav.displayedDate.day));
+                      },
+                    )],
                 ),
                 body: FutureBuilder<Map<DateTime, int>>(
                   future: singleton.allDates,
@@ -37,9 +50,10 @@ class CalendarState extends State<PhotosCalendar> {
                           availableCalendarFormats: const {
                             CalendarFormat.month: "Month"
                           },
+
                           firstDay: DateTime.utc(1950, 10, 16),
                           lastDay: DateTime.utc(2030, 3, 14),
-                          focusedDay: nav.currentDate,
+                          focusedDay: nav.displayedDate,
                           currentDay: nav.currentDate,
                           locale: 'fr_FR',
                           calendarFormat: CalendarFormat.month,

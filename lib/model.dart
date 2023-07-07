@@ -13,12 +13,13 @@ class ItemFolderPhoto {
 class ImageDto {
   final String littleUrl;
   final String fullscreenUrl;
+  final String hdUrl;
   final int index;
   final int nb;
   final int width;
   final int height;
 
-  ImageDto(this.littleUrl, this.fullscreenUrl, this.index, this.width, this.height, this.nb);
+  ImageDto(this.littleUrl, this.fullscreenUrl, this.hdUrl, this.index, this.width, this.height, this.nb);
 
   bool isPortrait(){
     return height / width > 1;

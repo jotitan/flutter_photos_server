@@ -58,8 +58,13 @@ class ImageView extends StatelessWidget {
           Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (context) => FullscreenImage(detail.fullscreenUrl,
-                      detail.index, detail.nb, pictures)));
+                  builder: (context) => FullscreenImage(
+                      detail.fullscreenUrl,
+                      detail.hdUrl,
+                      detail.height > detail.width,
+                      detail.index,
+                      detail.nb,
+                      pictures)));
         },
         child: ClipRect(
           child: Container(
@@ -86,7 +91,7 @@ class ImageView extends StatelessWidget {
   }
 }
 
-class SubFolderView extends StatelessWidget {
+class SubFolderView extends StatefulWidget {
   final Folder folder;
   final Widget parentWidget;
 
@@ -94,12 +99,18 @@ class SubFolderView extends StatelessWidget {
       : super(key: key);
 
   @override
+  State<SubFolderView> createState() => SubFolderViewState();
+}
+
+class SubFolderViewState extends State<SubFolderView> {
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: FolderBar(folder.name, parentWidget),
+        appBar: FolderBar(widget.folder.name, widget.parentWidget),
         body: SingleChildScrollView(
           child: Container(
-              color: Colors.black, child: FoldersView(folder.children, this)),
+              color: Colors.black,
+              child: FoldersView(widget.folder.children, widget)),
         ));
   }
 }
@@ -181,7 +192,7 @@ class PicturesOfFolderView extends StatelessWidget {
   final Widget parentWidget;
   final bool loadByDate;
 
-  const PicturesOfFolderView(this.name, this.searchKey, this.parentWidget,
+  PicturesOfFolderView(this.name, this.searchKey, this.parentWidget,
       {this.loadByDate = false, Key? key})
       : super(key: key);
 
@@ -191,8 +202,8 @@ class PicturesOfFolderView extends StatelessWidget {
     List<ImageView> images = List.empty(growable: true);
     pictures.asMap().forEach((index, picture) {
       images.add(ImageView(
-          ImageDto(picture.low, picture.medium, index, picture.width,
-              picture.height, pictures.length),
+          ImageDto(picture.low, picture.medium, picture.high, index,
+              picture.width, picture.height, pictures.length),
           size,
           pictures,
           this));
@@ -214,17 +225,20 @@ class PicturesOfFolderView extends StatelessWidget {
         ? FolderHelper.getPhotosByDate(searchKey)
         : FolderHelper.getPhotosOfFolder(searchKey);
 
+    Navigation n = Provider.of<Navigation>(context);
+
     return Scaffold(
       appBar: FolderBar(name, parentWidget),
-      body: SingleChildScrollView(
-          child: FutureBuilder(
+      body: FutureBuilder(
         future: pictures,
         builder: (context, snapshot) {
           if (snapshot.hasData) {
-            return Column(
-              children: get(snapshot.data as List<Picture>,
-                  MediaQuery.of(context).size.width),
-            );
+            return SingleChildScrollView(
+                controller: n.newScroller(name),
+                child: Column(
+                  children: get(snapshot.data as List<Picture>,
+                      MediaQuery.of(context).size.width),
+                ));
           } else {
             if (snapshot.hasError) {
               return AlertDialog(
@@ -240,7 +254,7 @@ class PicturesOfFolderView extends StatelessWidget {
             return const Text("Loading");
           }
         },
-      )),
+      ),
     );
   }
 }

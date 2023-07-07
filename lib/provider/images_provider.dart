@@ -13,7 +13,6 @@ class DataSingletonProvider extends ChangeNotifier {
 
 class FolderHelper {
   static Future<Folder> getFolders() async {
-    print("Load folders");
     var resp = await http.get(Uri.parse("$endpoint/rootFolders"),
         headers: {HttpHeaders.cookieHeader: "token=$apiKey"});
     var content = jsonDecode(resp.body);
